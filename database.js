@@ -27,11 +27,29 @@ db.serialize(() => {
         )
     `);
 
-    // 🔑 FORZAR usuario admin
-    db.run(`
-        INSERT OR IGNORE INTO usuarios (id, username, password)
-        VALUES (1, 'admin', '1234')
-    `);
+    // 🔥 ASEGURAR USUARIO ADMIN (FORMA PRO)
+    db.get(
+        `SELECT * FROM usuarios WHERE username = ?`,
+        ['admin'],
+        (err, row) => {
+            if (!row) {
+                db.run(
+                    `INSERT INTO usuarios (username, password)
+                     VALUES (?, ?)`,
+                    ['admin', '1234'],
+                    (err) => {
+                        if (err) {
+                            console.log("Error creando admin:", err);
+                        } else {
+                            console.log("Usuario admin creado");
+                        }
+                    }
+                );
+            } else {
+                console.log("Usuario admin ya existe");
+            }
+        }
+    );
 
 });
 
