@@ -14,7 +14,7 @@ app.use(express.json());
 app.post('/login', (req, res) => {
     const { username, password } = req.body;
 
-    console.log("LOGIN INTENTO:", username, password);
+    console.log("LOGIN:", username, password);
 
     db.get(
         `SELECT * FROM usuarios WHERE username = ? AND password = ?`,
@@ -22,20 +22,14 @@ app.post('/login', (req, res) => {
         (err, row) => {
             if (err) {
                 console.log("ERROR LOGIN:", err);
-                return res.json({ success: false, error: err.message });
-            }
-
-            if (!row) {
-                console.log("LOGIN FALLIDO");
                 return res.json({ success: false });
             }
 
-            console.log("LOGIN EXITOSO:", row);
+            if (!row) {
+                return res.json({ success: false });
+            }
 
-            res.json({
-                success: true,
-                user: row
-            });
+            res.json({ success: true, user: row });
         }
     );
 });
@@ -46,8 +40,6 @@ app.post('/login', (req, res) => {
 
 app.post('/checkin', (req, res) => {
     const { user_id, proyecto_id } = req.body;
-
-    console.log("CHECK IN:", user_id);
 
     const entrada = new Date().toISOString();
 
@@ -60,7 +52,6 @@ app.post('/checkin', (req, res) => {
                 console.log("ERROR CHECKIN:", err);
                 return res.json({ error: err.message });
             }
-
             res.json({ mensaje: "Check-in guardado" });
         }
     );
@@ -73,8 +64,6 @@ app.post('/checkin', (req, res) => {
 app.post('/checkout', (req, res) => {
     const { user_id } = req.body;
 
-    console.log("CHECK OUT:", user_id);
-
     db.get(
         `SELECT * FROM asistencias
          WHERE user_id = ? AND salida IS NULL
@@ -83,7 +72,7 @@ app.post('/checkout', (req, res) => {
         (err, row) => {
 
             if (err) {
-                console.log("ERROR CHECKOUT:", err);
+                console.log("ERROR BUSQUEDA:", err);
                 return res.json({ error: err.message });
             }
 
@@ -102,16 +91,12 @@ app.post('/checkout', (req, res) => {
                  WHERE id = ?`,
                 [salida.toISOString(), horas, row.id],
                 (err) => {
-
                     if (err) {
-                        console.log("ERROR UPDATE:", err);
+                        console.log("ERROR CHECKOUT:", err);
                         return res.json({ error: err.message });
                     }
 
-                    res.json({
-                        mensaje: "Check-out OK",
-                        horas
-                    });
+                    res.json({ mensaje: "Check-out OK", horas });
                 }
             );
         }
@@ -123,21 +108,21 @@ app.post('/checkout', (req, res) => {
 //////////////////////////////////////////////////
 
 app.get('/asistencias', (req, res) => {
-    db.all(`SELECT * FROM asistencias ORDER BY id DESC`, [], (err, rows) => {
-
+    db.all(`SELECT * FROM asistencias`, [], (err, rows) => {
         if (err) {
             console.log("ERROR GET:", err);
-            return res.json({ error: err.message });
+            return res.json([]);
         }
-
         res.json(rows);
     });
 });
 
 //////////////////////////////////////////////////
-// SERVIDOR
+// 🔥 PUERTO CORRECTO PARA RENDER
 //////////////////////////////////////////////////
 
-app.listen(3000, '0.0.0.0', () => {
-    console.log("🚀 Servidor corriendo en http://192.168.12.3:3000");
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
 });
