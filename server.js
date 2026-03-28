@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const db = require('./database');
+const { getDistance } = require('geolib');
 
 const app = express();
 
@@ -13,8 +14,6 @@ app.use(express.json());
 
 app.post('/login', (req, res) => {
     const { username, password } = req.body;
-
-    console.log("LOGIN:", username, password);
 
     db.get(
         `SELECT * FROM usuarios WHERE username = ? AND password = ?`,
@@ -35,39 +34,66 @@ app.post('/login', (req, res) => {
 });
 
 //////////////////////////////////////////////////
-// CHECK IN
+// ✅ CHECK IN (VALIDA DISTANCIA)
 //////////////////////////////////////////////////
 
 app.post('/checkin', (req, res) => {
-    const { user_id, proyecto_id } = req.body;
 
-    const entrada = new Date().toISOString();
+    const { user_id, proyecto_id, lat, lng, fecha } = req.body;
 
-    db.run(
-        `INSERT INTO asistencias (user_id, proyecto_id, entrada)
-         VALUES (?, ?, ?)`,
-        [user_id, proyecto_id, entrada],
-        function (err) {
-            if (err) {
-                console.log("ERROR CHECKIN:", err);
-                return res.json({ error: err.message });
+    db.get(
+        `SELECT * FROM proyectos WHERE id = ?`,
+        [proyecto_id],
+        (err, proyecto) => {
+
+            if (err || !proyecto) {
+                console.log("ERROR PROYECTO:", err);
+                return res.json({ error: "Proyecto no encontrado" });
             }
-            res.json({ mensaje: "Check-in guardado" });
+
+            const distancia = getDistance(
+                { latitude: lat, longitude: lng },
+                { latitude: proyecto.lat, longitude: proyecto.lng }
+            );
+
+            if (distancia > 500) {
+                console.log("❌ CHECK-IN FUERA DE RANGO:", distancia);
+                return res.json({ error: "Fuera de rango (500m)" });
+            }
+
+            const entrada = fecha || new Date().toISOString();
+
+            db.run(
+                `INSERT INTO asistencias (user_id, proyecto_id, entrada)
+                 VALUES (?, ?, ?)`,
+                [user_id, proyecto_id, entrada],
+                function (err) {
+                    if (err) {
+                        console.log("ERROR CHECKIN:", err);
+                        return res.json({ error: err.message });
+                    }
+
+                    res.json({ mensaje: "Check-in guardado" });
+                }
+            );
         }
     );
 });
 
 //////////////////////////////////////////////////
-// CHECK OUT
+// 🚨 CHECK OUT (PERMITE PERO ALERTA)
 //////////////////////////////////////////////////
 
 app.post('/checkout', (req, res) => {
-    const { user_id } = req.body;
+
+    const { user_id, lat, lng, fecha } = req.body;
 
     db.get(
-        `SELECT * FROM asistencias
-         WHERE user_id = ? AND salida IS NULL
-         ORDER BY id DESC LIMIT 1`,
+        `SELECT a.*, p.lat as proyecto_lat, p.lng as proyecto_lng
+         FROM asistencias a
+         JOIN proyectos p ON a.proyecto_id = p.id
+         WHERE a.user_id = ? AND a.salida IS NULL
+         ORDER BY a.id DESC LIMIT 1`,
         [user_id],
         (err, row) => {
 
@@ -80,7 +106,21 @@ app.post('/checkout', (req, res) => {
                 return res.json({ mensaje: "No hay entrada activa" });
             }
 
-            const salida = new Date();
+            const distancia = getDistance(
+                { latitude: lat, longitude: lng },
+                { latitude: row.proyecto_lat, longitude: row.proyecto_lng }
+            );
+
+            const fueraDeRango = distancia > 500;
+
+            if (fueraDeRango) {
+                console.log("🚨 ALERTA CHECK-OUT FUERA DE RANGO");
+                console.log("Usuario:", user_id);
+                console.log("Distancia:", distancia);
+                console.log("Ubicación:", lat, lng);
+            }
+
+            const salida = fecha ? new Date(fecha) : new Date();
             const entrada = new Date(row.entrada);
 
             const horas = ((salida - entrada) / (1000 * 60 * 60)).toFixed(2);
@@ -96,7 +136,11 @@ app.post('/checkout', (req, res) => {
                         return res.json({ error: err.message });
                     }
 
-                    res.json({ mensaje: "Check-out OK", horas });
+                    res.json({
+                        mensaje: "Check-out OK",
+                        horas,
+                        alerta: fueraDeRango
+                    });
                 }
             );
         }
@@ -104,21 +148,37 @@ app.post('/checkout', (req, res) => {
 });
 
 //////////////////////////////////////////////////
-// GET ASISTENCIAS
+// 📊 GET ASISTENCIAS
 //////////////////////////////////////////////////
 
 app.get('/asistencias', (req, res) => {
-    db.all(`SELECT * FROM asistencias`, [], (err, rows) => {
-        if (err) {
-            console.log("ERROR GET:", err);
-            return res.json([]);
+    db.all(
+        `SELECT * FROM asistencias ORDER BY id DESC`,
+        [],
+        (err, rows) => {
+            if (err) {
+                console.log("ERROR GET:", err);
+                return res.json([]);
+            }
+            res.json(rows);
         }
-        res.json(rows);
-    });
+    );
 });
 
 //////////////////////////////////////////////////
-// 🔥 PUERTO CORRECTO PARA RENDER
+// 🚨 ALERTAS (LOG)
+//////////////////////////////////////////////////
+
+app.post('/alerta', (req, res) => {
+
+    console.log("🚨 ALERTA RECIBIDA:");
+    console.log(req.body);
+
+    res.json({ ok: true });
+});
+
+//////////////////////////////////////////////////
+// 🚀 SERVIDOR
 //////////////////////////////////////////////////
 
 const PORT = process.env.PORT || 3000;
