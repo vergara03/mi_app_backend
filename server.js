@@ -34,6 +34,23 @@ app.post('/login', (req, res) => {
 });
 
 //////////////////////////////////////////////////
+// 👤 CREAR ADMIN (NUEVO)
+//////////////////////////////////////////////////
+
+app.get('/create-admin', (req, res) => {
+    db.run(
+        `INSERT INTO usuarios (username, password)
+         VALUES ('admin', '123456')`,
+        function (err) {
+            if (err) {
+                return res.send(err.message);
+            }
+            res.send("Admin creado correctamente");
+        }
+    );
+});
+
+//////////////////////////////////////////////////
 // ✅ CHECK IN (VALIDA DISTANCIA)
 //////////////////////////////////////////////////
 
@@ -81,7 +98,7 @@ app.post('/checkin', (req, res) => {
 });
 
 //////////////////////////////////////////////////
-// 🚨 CHECK OUT (PERMITE PERO ALERTA)
+// 🚨 CHECK OUT
 //////////////////////////////////////////////////
 
 app.post('/checkout', (req, res) => {
@@ -115,9 +132,6 @@ app.post('/checkout', (req, res) => {
 
             if (fueraDeRango) {
                 console.log("🚨 ALERTA CHECK-OUT FUERA DE RANGO");
-                console.log("Usuario:", user_id);
-                console.log("Distancia:", distancia);
-                console.log("Ubicación:", lat, lng);
             }
 
             const salida = fecha ? new Date(fecha) : new Date();
@@ -148,7 +162,7 @@ app.post('/checkout', (req, res) => {
 });
 
 //////////////////////////////////////////////////
-// 📊 GET ASISTENCIAS
+// 📊 ASISTENCIAS
 //////////////////////////////////////////////////
 
 app.get('/asistencias', (req, res) => {
@@ -166,14 +180,12 @@ app.get('/asistencias', (req, res) => {
 });
 
 //////////////////////////////////////////////////
-// 🚨 ALERTAS (LOG)
+// 🚨 ALERTAS
 //////////////////////////////////////////////////
 
 app.post('/alerta', (req, res) => {
-
     console.log("🚨 ALERTA RECIBIDA:");
     console.log(req.body);
-
     res.json({ ok: true });
 });
 
