@@ -69,7 +69,45 @@ app.get('/reset-admin', (req, res) => {
 });
 
 //////////////////////////////////////////////////
-// 🚨 ALERTAS (🔥 SOLUCIÓN A TU ERROR)
+// 👥 USUARIOS (🔥 NUEVO)
+//////////////////////////////////////////////////
+
+app.get('/admin/users', (req, res) => {
+    db.all(
+        `SELECT id, username FROM usuarios`,
+        [],
+        (err, rows) => {
+            if (err) {
+                console.log("ERROR USERS:", err);
+                return res.json([]);
+            }
+
+            res.json(rows);
+        }
+    );
+});
+
+//////////////////////////////////////////////////
+// 📊 ASISTENCIAS ADMIN (🔥 NUEVO)
+//////////////////////////////////////////////////
+
+app.get('/admin/attendances', (req, res) => {
+    db.all(
+        `SELECT * FROM asistencias ORDER BY id DESC`,
+        [],
+        (err, rows) => {
+            if (err) {
+                console.log("ERROR ATTENDANCES:", err);
+                return res.json([]);
+            }
+
+            res.json(rows);
+        }
+    );
+});
+
+//////////////////////////////////////////////////
+// 🚨 ALERTAS
 //////////////////////////////////////////////////
 
 app.get('/admin/alerts', (req, res) => {
@@ -190,7 +228,7 @@ app.post('/checkout', (req, res) => {
 });
 
 //////////////////////////////////////////////////
-// 📊 ASISTENCIAS
+// 📊 ASISTENCIAS (GENERAL)
 //////////////////////////////////////////////////
 
 app.get('/asistencias', (req, res) => {
