@@ -34,24 +34,42 @@ app.post('/login', (req, res) => {
 });
 
 //////////////////////////////////////////////////
-// 👤 CREAR ADMIN (NUEVO)
+// 👤 CREAR ADMIN
 //////////////////////////////////////////////////
 
 app.get('/create-admin', (req, res) => {
     db.run(
-        `INSERT INTO usuarios (username, password)
+        `INSERT OR IGNORE INTO usuarios (username, password)
          VALUES ('admin', '123456')`,
         function (err) {
             if (err) {
                 return res.send(err.message);
             }
-            res.send("Admin creado correctamente");
+
+            res.send("Admin listo (si ya existía, no se duplicó)");
         }
     );
 });
 
 //////////////////////////////////////////////////
-// ✅ CHECK IN (VALIDA DISTANCIA)
+// 🔄 RESET PASSWORD ADMIN (🔥 NUEVO)
+//////////////////////////////////////////////////
+
+app.get('/reset-admin', (req, res) => {
+    db.run(
+        `UPDATE usuarios SET password = '123456' WHERE username = 'admin'`,
+        function (err) {
+            if (err) {
+                return res.send(err.message);
+            }
+
+            res.send("Password reseteada correctamente");
+        }
+    );
+});
+
+//////////////////////////////////////////////////
+// ✅ CHECK IN
 //////////////////////////////////////////////////
 
 app.post('/checkin', (req, res) => {
@@ -74,7 +92,6 @@ app.post('/checkin', (req, res) => {
             );
 
             if (distancia > 500) {
-                console.log("❌ CHECK-IN FUERA DE RANGO:", distancia);
                 return res.json({ error: "Fuera de rango (500m)" });
             }
 
@@ -86,7 +103,6 @@ app.post('/checkin', (req, res) => {
                 [user_id, proyecto_id, entrada],
                 function (err) {
                     if (err) {
-                        console.log("ERROR CHECKIN:", err);
                         return res.json({ error: err.message });
                     }
 
@@ -115,7 +131,6 @@ app.post('/checkout', (req, res) => {
         (err, row) => {
 
             if (err) {
-                console.log("ERROR BUSQUEDA:", err);
                 return res.json({ error: err.message });
             }
 
@@ -130,10 +145,6 @@ app.post('/checkout', (req, res) => {
 
             const fueraDeRango = distancia > 500;
 
-            if (fueraDeRango) {
-                console.log("🚨 ALERTA CHECK-OUT FUERA DE RANGO");
-            }
-
             const salida = fecha ? new Date(fecha) : new Date();
             const entrada = new Date(row.entrada);
 
@@ -146,7 +157,6 @@ app.post('/checkout', (req, res) => {
                 [salida.toISOString(), horas, row.id],
                 (err) => {
                     if (err) {
-                        console.log("ERROR CHECKOUT:", err);
                         return res.json({ error: err.message });
                     }
 
@@ -170,10 +180,7 @@ app.get('/asistencias', (req, res) => {
         `SELECT * FROM asistencias ORDER BY id DESC`,
         [],
         (err, rows) => {
-            if (err) {
-                console.log("ERROR GET:", err);
-                return res.json([]);
-            }
+            if (err) return res.json([]);
             res.json(rows);
         }
     );
@@ -184,8 +191,7 @@ app.get('/asistencias', (req, res) => {
 //////////////////////////////////////////////////
 
 app.post('/alerta', (req, res) => {
-    console.log("🚨 ALERTA RECIBIDA:");
-    console.log(req.body);
+    console.log("🚨 ALERTA:", req.body);
     res.json({ ok: true });
 });
 
