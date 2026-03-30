@@ -69,7 +69,7 @@ app.get('/reset-admin', (req, res) => {
 });
 
 //////////////////////////////////////////////////
-// 👥 USUARIOS (🔥 NUEVO)
+// 👥 OBTENER USUARIOS
 //////////////////////////////////////////////////
 
 app.get('/admin/users', (req, res) => {
@@ -88,7 +88,31 @@ app.get('/admin/users', (req, res) => {
 });
 
 //////////////////////////////////////////////////
-// 📊 ASISTENCIAS ADMIN (🔥 NUEVO)
+// ➕ CREAR USUARIO (🔥 NUEVO PASO 9)
+//////////////////////////////////////////////////
+
+app.post('/admin/users', (req, res) => {
+    const { username, password } = req.body;
+
+    db.run(
+        `INSERT INTO usuarios (username, password) VALUES (?, ?)`,
+        [username, password],
+        function (err) {
+            if (err) {
+                console.log("ERROR CREATE USER:", err);
+                return res.json({ error: err.message });
+            }
+
+            res.json({
+                mensaje: "Usuario creado",
+                id: this.lastID
+            });
+        }
+    );
+});
+
+//////////////////////////////////////////////////
+// 📊 ASISTENCIAS ADMIN
 //////////////////////////////////////////////////
 
 app.get('/admin/attendances', (req, res) => {
@@ -228,7 +252,7 @@ app.post('/checkout', (req, res) => {
 });
 
 //////////////////////////////////////////////////
-// 📊 ASISTENCIAS (GENERAL)
+// 📊 ASISTENCIAS GENERAL
 //////////////////////////////////////////////////
 
 app.get('/asistencias', (req, res) => {
