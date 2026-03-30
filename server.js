@@ -88,7 +88,7 @@ app.get('/admin/users', (req, res) => {
 });
 
 //////////////////////////////////////////////////
-// ➕ CREAR USUARIO (🔥 NUEVO PASO 9)
+// ➕ CREAR USUARIO
 //////////////////////////////////////////////////
 
 app.post('/admin/users', (req, res) => {
@@ -107,6 +107,27 @@ app.post('/admin/users', (req, res) => {
                 mensaje: "Usuario creado",
                 id: this.lastID
             });
+        }
+    );
+});
+
+//////////////////////////////////////////////////
+// ❌ ELIMINAR USUARIO (🔥 PASO 10)
+//////////////////////////////////////////////////
+
+app.delete('/admin/users/:id', (req, res) => {
+    const { id } = req.params;
+
+    db.run(
+        `DELETE FROM usuarios WHERE id = ?`,
+        [id],
+        function (err) {
+            if (err) {
+                console.log("ERROR DELETE USER:", err);
+                return res.json({ error: err.message });
+            }
+
+            res.json({ mensaje: "Usuario eliminado" });
         }
     );
 });
