@@ -46,13 +46,13 @@ app.get('/create-admin', (req, res) => {
                 return res.send(err.message);
             }
 
-            res.send("Admin listo (si ya existía, no se duplicó)");
+            res.send("Admin listo");
         }
     );
 });
 
 //////////////////////////////////////////////////
-// 🔄 RESET PASSWORD ADMIN (🔥 NUEVO)
+// 🔄 RESET PASSWORD ADMIN
 //////////////////////////////////////////////////
 
 app.get('/reset-admin', (req, res) => {
@@ -64,6 +64,25 @@ app.get('/reset-admin', (req, res) => {
             }
 
             res.send("Password reseteada correctamente");
+        }
+    );
+});
+
+//////////////////////////////////////////////////
+// 🚨 ALERTAS (🔥 SOLUCIÓN A TU ERROR)
+//////////////////////////////////////////////////
+
+app.get('/admin/alerts', (req, res) => {
+    db.all(
+        `SELECT * FROM asistencias WHERE horas > 8 ORDER BY id DESC`,
+        [],
+        (err, rows) => {
+            if (err) {
+                console.log("ERROR ALERTS:", err);
+                return res.json([]);
+            }
+
+            res.json(rows);
         }
     );
 });
@@ -82,7 +101,6 @@ app.post('/checkin', (req, res) => {
         (err, proyecto) => {
 
             if (err || !proyecto) {
-                console.log("ERROR PROYECTO:", err);
                 return res.json({ error: "Proyecto no encontrado" });
             }
 
@@ -187,7 +205,7 @@ app.get('/asistencias', (req, res) => {
 });
 
 //////////////////////////////////////////////////
-// 🚨 ALERTAS
+// 🚨 ALERTA SIMPLE
 //////////////////////////////////////////////////
 
 app.post('/alerta', (req, res) => {
