@@ -1,11 +1,50 @@
 const express = require('express');
 const cors = require('cors');
-const db = require('./database_pg'); // 🔥 CAMBIO IMPORTANTE
+const db = require('./database_pg');
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+//////////////////////////////////////////////////
+// 🔧 CREAR TABLAS (SOLO UNA VEZ)
+//////////////////////////////////////////////////
+
+app.get('/setup-db', async (req, res) => {
+    try {
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS usuarios (
+                id SERIAL PRIMARY KEY,
+                username TEXT UNIQUE,
+                password TEXT
+            );
+        `);
+
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS asistencias (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER,
+                proyecto_id INTEGER,
+                entrada TIMESTAMP,
+                salida TIMESTAMP,
+                horas FLOAT
+            );
+        `);
+
+        await db.query(`
+            INSERT INTO usuarios (username, password)
+            VALUES ('admin', '123456')
+            ON CONFLICT (username) DO NOTHING;
+        `);
+
+        res.send("Base de datos lista 🚀");
+
+    } catch (error) {
+        console.log(error);
+        res.send("Error creando BD ❌");
+    }
+});
 
 //////////////////////////////////////////////////
 // 🔐 LOGIN
