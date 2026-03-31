@@ -112,7 +112,7 @@ app.post('/admin/users', (req, res) => {
 });
 
 //////////////////////////////////////////////////
-// ❌ ELIMINAR USUARIO (🔥 PASO 10)
+// ❌ ELIMINAR USUARIO
 //////////////////////////////////////////////////
 
 app.delete('/admin/users/:id', (req, res) => {
@@ -128,6 +128,28 @@ app.delete('/admin/users/:id', (req, res) => {
             }
 
             res.json({ mensaje: "Usuario eliminado" });
+        }
+    );
+});
+
+//////////////////////////////////////////////////
+// ✏️ EDITAR USUARIO (🔥 PASO 11)
+//////////////////////////////////////////////////
+
+app.put('/admin/users/:id', (req, res) => {
+    const { id } = req.params;
+    const { username, password } = req.body;
+
+    db.run(
+        `UPDATE usuarios SET username = ?, password = ? WHERE id = ?`,
+        [username, password, id],
+        function (err) {
+            if (err) {
+                console.log("ERROR UPDATE USER:", err);
+                return res.json({ error: err.message });
+            }
+
+            res.json({ mensaje: "Usuario actualizado" });
         }
     );
 });
