@@ -32,6 +32,7 @@ app.get('/setup-db', async (req, res) => {
             );
         `);
 
+        // 🔥 SOLO CREA ADMIN SI NO EXISTE
         await db.query(`
             INSERT INTO usuarios (username, password)
             VALUES ('admin', '123456')
@@ -41,7 +42,7 @@ app.get('/setup-db', async (req, res) => {
         res.send("Base de datos lista 🚀");
 
     } catch (error) {
-        console.log(error);
+        console.log("ERROR SETUP:", error);
         res.send("Error creando BD ❌");
     }
 });
@@ -66,7 +67,7 @@ app.post('/login', async (req, res) => {
         res.json({ success: true, user: result.rows[0] });
 
     } catch (error) {
-        console.log(error);
+        console.log("ERROR LOGIN:", error);
         res.json({ success: false });
     }
 });
@@ -82,7 +83,7 @@ app.get('/admin/users', async (req, res) => {
         );
         res.json(result.rows);
     } catch (error) {
-        console.log(error);
+        console.log("ERROR USERS:", error);
         res.json([]);
     }
 });
@@ -93,6 +94,10 @@ app.get('/admin/users', async (req, res) => {
 
 app.post('/admin/users', async (req, res) => {
     const { username, password } = req.body;
+
+    if (!username || !password) {
+        return res.json({ error: "Campos requeridos" });
+    }
 
     try {
         const result = await db.query(
@@ -106,7 +111,7 @@ app.post('/admin/users', async (req, res) => {
         });
 
     } catch (error) {
-        console.log(error);
+        console.log("ERROR CREATE USER:", error);
         res.json({ error: error.message });
     }
 });
@@ -127,7 +132,7 @@ app.delete('/admin/users/:id', async (req, res) => {
         res.json({ mensaje: "Usuario eliminado" });
 
     } catch (error) {
-        console.log(error);
+        console.log("ERROR DELETE USER:", error);
         res.json({ error: error.message });
     }
 });
@@ -149,7 +154,7 @@ app.put('/admin/users/:id', async (req, res) => {
         res.json({ mensaje: "Usuario actualizado" });
 
     } catch (error) {
-        console.log(error);
+        console.log("ERROR UPDATE USER:", error);
         res.json({ error: error.message });
     }
 });
@@ -167,7 +172,7 @@ app.get('/admin/attendances', async (req, res) => {
         res.json(result.rows);
 
     } catch (error) {
-        console.log(error);
+        console.log("ERROR ATTENDANCES:", error);
         res.json([]);
     }
 });
@@ -185,7 +190,7 @@ app.get('/admin/alerts', async (req, res) => {
         res.json(result.rows);
 
     } catch (error) {
-        console.log(error);
+        console.log("ERROR ALERTS:", error);
         res.json([]);
     }
 });
