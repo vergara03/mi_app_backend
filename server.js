@@ -68,7 +68,7 @@ app.get('/setup-db', async (req, res) => {
 });
 
 //////////////////////////////////////////////////
-// 🔐 LOGIN COMPATIBLE (WEB + MÓVIL)
+// 🔐 LOGIN
 //////////////////////////////////////////////////
 
 app.post('/login', async (req, res) => {
@@ -92,7 +92,6 @@ app.post('/login', async (req, res) => {
             { expiresIn: "2h" }
         );
 
-        // 🔥 RESPUESTA COMPATIBLE
         res.json({
             success: true,
             user: {
@@ -109,81 +108,32 @@ app.post('/login', async (req, res) => {
 });
 
 //////////////////////////////////////////////////
-// 👥 USUARIOS
+// 🚀 🔥 NUEVAS RUTAS (LA SOLUCIÓN)
 //////////////////////////////////////////////////
 
-app.get('/admin/users', verifyToken, async (req, res) => {
-    try {
-        const result = await db.query(
-            'SELECT id, username FROM usuarios ORDER BY id DESC'
-        );
-        res.json(result.rows);
-    } catch (error) {
-        console.log("ERROR USERS:", error);
-        res.json([]);
-    }
-});
-
-app.post('/admin/users', verifyToken, async (req, res) => {
-    const { username, password } = req.body;
-
-    try {
-        const result = await db.query(
-            'INSERT INTO usuarios (username, password) VALUES ($1, $2) RETURNING id',
-            [username, password]
-        );
-
-        res.json({
-            mensaje: "Usuario creado",
-            id: result.rows[0].id
-        });
-
-    } catch (error) {
-        console.log("ERROR CREATE USER:", error);
-        res.json({ error: error.message });
-    }
-});
-
-app.put('/admin/users/:id', verifyToken, async (req, res) => {
-    const { id } = req.params;
-    const { username, password } = req.body;
+// ✅ GUARDAR ASISTENCIA (APP MÓVIL)
+app.post('/asistencias', async (req, res) => {
+    const { user_id, proyecto_id, entrada, horas, fuera_zona } = req.body;
 
     try {
         await db.query(
-            'UPDATE usuarios SET username = $1, password = $2 WHERE id = $3',
-            [username, password, id]
+            `INSERT INTO asistencias (user_id, proyecto_id, entrada, horas, fuera_zona)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [user_id, proyecto_id, entrada, horas || 0, fuera_zona]
         );
 
-        res.json({ mensaje: "Usuario actualizado" });
+        console.log("📥 NUEVA ASISTENCIA:", req.body);
+
+        res.json({ mensaje: "Guardado correctamente" });
 
     } catch (error) {
-        console.log("ERROR UPDATE USER:", error);
-        res.json({ error: error.message });
+        console.log("❌ ERROR INSERT:", error);
+        res.status(500).json({ error: "Error al guardar" });
     }
 });
 
-app.delete('/admin/users/:id', verifyToken, async (req, res) => {
-    const { id } = req.params;
-
-    try {
-        await db.query(
-            'DELETE FROM usuarios WHERE id = $1',
-            [id]
-        );
-
-        res.json({ mensaje: "Usuario eliminado" });
-
-    } catch (error) {
-        console.log("ERROR DELETE USER:", error);
-        res.json({ error: error.message });
-    }
-});
-
-//////////////////////////////////////////////////
-// 📊 ASISTENCIAS
-//////////////////////////////////////////////////
-
-app.get('/admin/attendances', verifyToken, async (req, res) => {
+// ✅ OBTENER TODAS (PARA WEB Y DEBUG)
+app.get('/asistencias', async (req, res) => {
     try {
         const result = await db.query(
             'SELECT * FROM asistencias ORDER BY id DESC'
@@ -192,33 +142,69 @@ app.get('/admin/attendances', verifyToken, async (req, res) => {
         res.json(result.rows);
 
     } catch (error) {
-        console.log("ERROR ATTENDANCES:", error);
+        console.log("❌ ERROR GET ASISTENCIAS:", error);
         res.json([]);
     }
 });
 
 //////////////////////////////////////////////////
-// 🚨 ALERTAS (MEJORADAS)
+// 👥 USUARIOS
+//////////////////////////////////////////////////
+
+app.get('/admin/users', verifyToken, async (req, res) => {
+    const result = await db.query(
+        'SELECT id, username FROM usuarios ORDER BY id DESC'
+    );
+    res.json(result.rows);
+});
+
+app.post('/admin/users', verifyToken, async (req, res) => {
+    const { username, password } = req.body;
+
+    const result = await db.query(
+        'INSERT INTO usuarios (username, password) VALUES ($1, $2) RETURNING id',
+        [username, password]
+    );
+
+    res.json({ id: result.rows[0].id });
+});
+
+app.put('/admin/users/:id', verifyToken, async (req, res) => {
+    const { id } = req.params;
+    const { username, password } = req.body;
+
+    await db.query(
+        'UPDATE usuarios SET username=$1, password=$2 WHERE id=$3',
+        [username, password, id]
+    );
+
+    res.json({ ok: true });
+});
+
+app.delete('/admin/users/:id', verifyToken, async (req, res) => {
+    const { id } = req.params;
+
+    await db.query('DELETE FROM usuarios WHERE id=$1', [id]);
+
+    res.json({ ok: true });
+});
+
+//////////////////////////////////////////////////
+// 🚨 ALERTAS
 //////////////////////////////////////////////////
 
 app.get('/admin/alerts', verifyToken, async (req, res) => {
-    try {
-        const result = await db.query(`
-            SELECT * FROM asistencias 
-            WHERE horas > 8 OR fuera_zona = true
-            ORDER BY id DESC
-        `);
+    const result = await db.query(`
+        SELECT * FROM asistencias 
+        WHERE horas > 8 OR fuera_zona = true
+        ORDER BY id DESC
+    `);
 
-        res.json(result.rows);
-
-    } catch (error) {
-        console.log("ERROR ALERTS:", error);
-        res.json([]);
-    }
+    res.json(result.rows);
 });
 
 //////////////////////////////////////////////////
-// 🚀 SERVIDOR
+// 🚀 SERVER
 //////////////////////////////////////////////////
 
 const PORT = process.env.PORT || 3000;
