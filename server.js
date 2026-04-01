@@ -5,7 +5,19 @@ const jwt = require('jsonwebtoken');
 
 const app = express();
 
-app.use(cors());
+//////////////////////////////////////////////////
+// 🔥 CORS CORREGIDO (MUY IMPORTANTE)
+//////////////////////////////////////////////////
+
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
+
+// 🔥 MANEJO PREFLIGHT
+app.options('*', cors());
+
 app.use(express.json());
 
 //////////////////////////////////////////////////
@@ -28,7 +40,7 @@ const verifyToken = (req, res, next) => {
 };
 
 //////////////////////////////////////////////////
-// 🔧 CREAR TABLAS
+// 🔧 SETUP DB
 //////////////////////////////////////////////////
 
 app.get('/setup-db', async (req, res) => {
@@ -59,59 +71,49 @@ app.get('/setup-db', async (req, res) => {
             ON CONFLICT (username) DO NOTHING;
         `);
 
-        res.send("Base de datos lista 🚀");
+        res.send("BD lista");
 
     } catch (error) {
-        console.log("ERROR SETUP:", error);
-        res.send("Error creando BD ❌");
+        console.log(error);
+        res.send("Error BD");
     }
 });
 
 //////////////////////////////////////////////////
-// 🔐 LOGIN
+// LOGIN
 //////////////////////////////////////////////////
 
 app.post('/login', async (req, res) => {
     const { username, password } = req.body;
 
-    try {
-        const result = await db.query(
-            'SELECT * FROM usuarios WHERE username = $1 AND password = $2',
-            [username, password]
-        );
+    const result = await db.query(
+        'SELECT * FROM usuarios WHERE username=$1 AND password=$2',
+        [username, password]
+    );
 
-        if (result.rows.length === 0) {
-            return res.status(401).json({ success: false });
-        }
-
-        const user = result.rows[0];
-
-        const token = jwt.sign(
-            { id: user.id, username: user.username },
-            "CLAVE_SECRETA",
-            { expiresIn: "2h" }
-        );
-
-        res.json({
-            success: true,
-            user: {
-                id: user.id,
-                username: user.username
-            },
-            token: token
-        });
-
-    } catch (error) {
-        console.log("ERROR LOGIN:", error);
-        res.status(500).json({ success: false });
+    if (result.rows.length === 0) {
+        return res.status(401).json({ success: false });
     }
+
+    const user = result.rows[0];
+
+    const token = jwt.sign(
+        { id: user.id },
+        "CLAVE_SECRETA",
+        { expiresIn: "2h" }
+    );
+
+    res.json({
+        success: true,
+        user,
+        token
+    });
 });
 
 //////////////////////////////////////////////////
-// 🚀 🔥 NUEVAS RUTAS (LA SOLUCIÓN)
+// 🔥 ASISTENCIAS (CLAVE)
 //////////////////////////////////////////////////
 
-// ✅ GUARDAR ASISTENCIA (APP MÓVIL)
 app.post('/asistencias', async (req, res) => {
     const { user_id, proyecto_id, entrada, horas, fuera_zona } = req.body;
 
@@ -122,71 +124,30 @@ app.post('/asistencias', async (req, res) => {
             [user_id, proyecto_id, entrada, horas || 0, fuera_zona]
         );
 
-        console.log("📥 NUEVA ASISTENCIA:", req.body);
+        console.log("📥 GUARDADO:", req.body);
 
-        res.json({ mensaje: "Guardado correctamente" });
+        res.json({ ok: true });
 
     } catch (error) {
-        console.log("❌ ERROR INSERT:", error);
-        res.status(500).json({ error: "Error al guardar" });
+        console.log(error);
+        res.status(500).json({ error: "Error insert" });
     }
 });
 
-// ✅ OBTENER TODAS (PARA WEB Y DEBUG)
 app.get('/asistencias', async (req, res) => {
-    try {
-        const result = await db.query(
-            'SELECT * FROM asistencias ORDER BY id DESC'
-        );
-
-        res.json(result.rows);
-
-    } catch (error) {
-        console.log("❌ ERROR GET ASISTENCIAS:", error);
-        res.json([]);
-    }
-});
-
-//////////////////////////////////////////////////
-// 👥 USUARIOS
-//////////////////////////////////////////////////
-
-app.get('/admin/users', verifyToken, async (req, res) => {
     const result = await db.query(
-        'SELECT id, username FROM usuarios ORDER BY id DESC'
+        'SELECT * FROM asistencias ORDER BY id DESC'
     );
     res.json(result.rows);
 });
 
-app.post('/admin/users', verifyToken, async (req, res) => {
-    const { username, password } = req.body;
+//////////////////////////////////////////////////
+// ADMIN
+//////////////////////////////////////////////////
 
-    const result = await db.query(
-        'INSERT INTO usuarios (username, password) VALUES ($1, $2) RETURNING id',
-        [username, password]
-    );
-
-    res.json({ id: result.rows[0].id });
-});
-
-app.put('/admin/users/:id', verifyToken, async (req, res) => {
-    const { id } = req.params;
-    const { username, password } = req.body;
-
-    await db.query(
-        'UPDATE usuarios SET username=$1, password=$2 WHERE id=$3',
-        [username, password, id]
-    );
-
-    res.json({ ok: true });
-});
-
-app.delete('/admin/users/:id', verifyToken, async (req, res) => {
-    const { id } = req.params;
-
-    await db.query('DELETE FROM usuarios WHERE id=$1', [id]);
-
-    res.json({ ok: true });
+app.get('/admin/users', verifyToken, async (req, res) => {
+    const result = await db.query('SELECT id, username FROM usuarios');
+    res.json(result.rows);
 });
 
 //////////////////////////////////////////////////
@@ -195,7 +156,7 @@ app.delete('/admin/users/:id', verifyToken, async (req, res) => {
 
 app.get('/admin/alerts', verifyToken, async (req, res) => {
     const result = await db.query(`
-        SELECT * FROM asistencias 
+        SELECT * FROM asistencias
         WHERE horas > 8 OR fuera_zona = true
         ORDER BY id DESC
     `);
@@ -204,11 +165,11 @@ app.get('/admin/alerts', verifyToken, async (req, res) => {
 });
 
 //////////////////////////////////////////////////
-// 🚀 SERVER
+// SERVER
 //////////////////////////////////////////////////
 
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-    console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
+    console.log("Servidor corriendo 🚀");
 });
