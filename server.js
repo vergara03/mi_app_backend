@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const db = require('./database_pg');
+const jwt = require('jsonwebtoken'); // 🔐 JWT
 
 const app = express();
 
@@ -8,7 +9,26 @@ app.use(cors());
 app.use(express.json());
 
 //////////////////////////////////////////////////
-// 🔧 CREAR TABLAS (SOLO UNA VEZ)
+// 🔐 MIDDLEWARE JWT
+//////////////////////////////////////////////////
+
+const verifyToken = (req, res, next) => {
+    const authHeader = req.headers["authorization"];
+
+    if (!authHeader) return res.status(403).json({ error: "Token requerido" });
+
+    const token = authHeader.split(" ")[1];
+
+    jwt.verify(token, "CLAVE_SECRETA", (err, user) => {
+        if (err) return res.status(403).json({ error: "Token inválido" });
+
+        req.user = user;
+        next();
+    });
+};
+
+//////////////////////////////////////////////////
+// 🔧 CREAR TABLAS
 //////////////////////////////////////////////////
 
 app.get('/setup-db', async (req, res) => {
@@ -32,7 +52,6 @@ app.get('/setup-db', async (req, res) => {
             );
         `);
 
-        // 🔥 SOLO CREA ADMIN SI NO EXISTE
         await db.query(`
             INSERT INTO usuarios (username, password)
             VALUES ('admin', '123456')
@@ -48,7 +67,7 @@ app.get('/setup-db', async (req, res) => {
 });
 
 //////////////////////////////////////////////////
-// 🔐 LOGIN
+// 🔐 LOGIN CON TOKEN
 //////////////////////////////////////////////////
 
 app.post('/login', async (req, res) => {
@@ -61,22 +80,31 @@ app.post('/login', async (req, res) => {
         );
 
         if (result.rows.length === 0) {
-            return res.json({ success: false });
+            return res.status(401).json({ error: "Credenciales incorrectas" });
         }
 
-        res.json({ success: true, user: result.rows[0] });
+        const user = result.rows[0];
+
+        // 🔥 CREAR TOKEN
+        const token = jwt.sign(
+            { id: user.id, username: user.username },
+            "CLAVE_SECRETA",
+            { expiresIn: "2h" }
+        );
+
+        res.json({ token });
 
     } catch (error) {
         console.log("ERROR LOGIN:", error);
-        res.json({ success: false });
+        res.status(500).json({ error: "Error servidor" });
     }
 });
 
 //////////////////////////////////////////////////
-// 👥 OBTENER USUARIOS
+// 👥 USUARIOS (PROTEGIDO)
 //////////////////////////////////////////////////
 
-app.get('/admin/users', async (req, res) => {
+app.get('/admin/users', verifyToken, async (req, res) => {
     try {
         const result = await db.query(
             'SELECT id, username FROM usuarios ORDER BY id DESC'
@@ -92,7 +120,7 @@ app.get('/admin/users', async (req, res) => {
 // ➕ CREAR USUARIO
 //////////////////////////////////////////////////
 
-app.post('/admin/users', async (req, res) => {
+app.post('/admin/users', verifyToken, async (req, res) => {
     const { username, password } = req.body;
 
     if (!username || !password) {
@@ -120,7 +148,7 @@ app.post('/admin/users', async (req, res) => {
 // ❌ ELIMINAR USUARIO
 //////////////////////////////////////////////////
 
-app.delete('/admin/users/:id', async (req, res) => {
+app.delete('/admin/users/:id', verifyToken, async (req, res) => {
     const { id } = req.params;
 
     try {
@@ -141,7 +169,7 @@ app.delete('/admin/users/:id', async (req, res) => {
 // ✏️ EDITAR USUARIO
 //////////////////////////////////////////////////
 
-app.put('/admin/users/:id', async (req, res) => {
+app.put('/admin/users/:id', verifyToken, async (req, res) => {
     const { id } = req.params;
     const { username, password } = req.body;
 
@@ -163,7 +191,7 @@ app.put('/admin/users/:id', async (req, res) => {
 // 📊 ASISTENCIAS
 //////////////////////////////////////////////////
 
-app.get('/admin/attendances', async (req, res) => {
+app.get('/admin/attendances', verifyToken, async (req, res) => {
     try {
         const result = await db.query(
             'SELECT * FROM asistencias ORDER BY id DESC'
@@ -181,7 +209,7 @@ app.get('/admin/attendances', async (req, res) => {
 // 🚨 ALERTAS
 //////////////////////////////////////////////////
 
-app.get('/admin/alerts', async (req, res) => {
+app.get('/admin/alerts', verifyToken, async (req, res) => {
     try {
         const result = await db.query(
             'SELECT * FROM asistencias WHERE horas > 8 ORDER BY id DESC'
