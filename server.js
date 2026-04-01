@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const db = require('./database_pg');
-const jwt = require('jsonwebtoken'); // 🔐 JWT
+const jwt = require('jsonwebtoken');
 
 const app = express();
 
@@ -48,7 +48,8 @@ app.get('/setup-db', async (req, res) => {
                 proyecto_id INTEGER,
                 entrada TIMESTAMP,
                 salida TIMESTAMP,
-                horas FLOAT
+                horas FLOAT,
+                fuera_zona BOOLEAN DEFAULT false
             );
         `);
 
@@ -67,7 +68,7 @@ app.get('/setup-db', async (req, res) => {
 });
 
 //////////////////////////////////////////////////
-// 🔐 LOGIN CON TOKEN
+// 🔐 LOGIN COMPATIBLE (WEB + MÓVIL)
 //////////////////////////////////////////////////
 
 app.post('/login', async (req, res) => {
@@ -80,28 +81,35 @@ app.post('/login', async (req, res) => {
         );
 
         if (result.rows.length === 0) {
-            return res.status(401).json({ error: "Credenciales incorrectas" });
+            return res.status(401).json({ success: false });
         }
 
         const user = result.rows[0];
 
-        // 🔥 CREAR TOKEN
         const token = jwt.sign(
             { id: user.id, username: user.username },
             "CLAVE_SECRETA",
             { expiresIn: "2h" }
         );
 
-        res.json({ token });
+        // 🔥 RESPUESTA COMPATIBLE
+        res.json({
+            success: true,
+            user: {
+                id: user.id,
+                username: user.username
+            },
+            token: token
+        });
 
     } catch (error) {
         console.log("ERROR LOGIN:", error);
-        res.status(500).json({ error: "Error servidor" });
+        res.status(500).json({ success: false });
     }
 });
 
 //////////////////////////////////////////////////
-// 👥 USUARIOS (PROTEGIDO)
+// 👥 USUARIOS
 //////////////////////////////////////////////////
 
 app.get('/admin/users', verifyToken, async (req, res) => {
@@ -116,16 +124,8 @@ app.get('/admin/users', verifyToken, async (req, res) => {
     }
 });
 
-//////////////////////////////////////////////////
-// ➕ CREAR USUARIO
-//////////////////////////////////////////////////
-
 app.post('/admin/users', verifyToken, async (req, res) => {
     const { username, password } = req.body;
-
-    if (!username || !password) {
-        return res.json({ error: "Campos requeridos" });
-    }
 
     try {
         const result = await db.query(
@@ -144,31 +144,6 @@ app.post('/admin/users', verifyToken, async (req, res) => {
     }
 });
 
-//////////////////////////////////////////////////
-// ❌ ELIMINAR USUARIO
-//////////////////////////////////////////////////
-
-app.delete('/admin/users/:id', verifyToken, async (req, res) => {
-    const { id } = req.params;
-
-    try {
-        await db.query(
-            'DELETE FROM usuarios WHERE id = $1',
-            [id]
-        );
-
-        res.json({ mensaje: "Usuario eliminado" });
-
-    } catch (error) {
-        console.log("ERROR DELETE USER:", error);
-        res.json({ error: error.message });
-    }
-});
-
-//////////////////////////////////////////////////
-// ✏️ EDITAR USUARIO
-//////////////////////////////////////////////////
-
 app.put('/admin/users/:id', verifyToken, async (req, res) => {
     const { id } = req.params;
     const { username, password } = req.body;
@@ -183,6 +158,23 @@ app.put('/admin/users/:id', verifyToken, async (req, res) => {
 
     } catch (error) {
         console.log("ERROR UPDATE USER:", error);
+        res.json({ error: error.message });
+    }
+});
+
+app.delete('/admin/users/:id', verifyToken, async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        await db.query(
+            'DELETE FROM usuarios WHERE id = $1',
+            [id]
+        );
+
+        res.json({ mensaje: "Usuario eliminado" });
+
+    } catch (error) {
+        console.log("ERROR DELETE USER:", error);
         res.json({ error: error.message });
     }
 });
@@ -206,14 +198,16 @@ app.get('/admin/attendances', verifyToken, async (req, res) => {
 });
 
 //////////////////////////////////////////////////
-// 🚨 ALERTAS
+// 🚨 ALERTAS (MEJORADAS)
 //////////////////////////////////////////////////
 
 app.get('/admin/alerts', verifyToken, async (req, res) => {
     try {
-        const result = await db.query(
-            'SELECT * FROM asistencias WHERE horas > 8 ORDER BY id DESC'
-        );
+        const result = await db.query(`
+            SELECT * FROM asistencias 
+            WHERE horas > 8 OR fuera_zona = true
+            ORDER BY id DESC
+        `);
 
         res.json(result.rows);
 
