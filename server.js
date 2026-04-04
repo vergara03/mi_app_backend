@@ -1,22 +1,31 @@
 const express = require('express');
-const cors = require('cors');
 const db = require('./database_pg');
 const jwt = require('jsonwebtoken');
 
 const app = express();
 
 //////////////////////////////////////////////////
-// 🔥 CORS CORREGIDO (MUY IMPORTANTE)
+// 🔥 CORS MANUAL (ESTABLE EN RENDER)
 //////////////////////////////////////////////////
 
-app.use(cors({
-  origin: "*",
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"]
-}));
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header(
+    "Access-Control-Allow-Headers",
+    "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+  );
+  res.header(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, DELETE, OPTIONS"
+  );
 
-// 🔥 MANEJO PREFLIGHT
-app.options('*', cors());
+  // 🔥 IMPORTANTE: responder preflight
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+
+  next();
+});
 
 app.use(express.json());
 
@@ -25,18 +34,18 @@ app.use(express.json());
 //////////////////////////////////////////////////
 
 const verifyToken = (req, res, next) => {
-    const authHeader = req.headers["authorization"];
+  const authHeader = req.headers["authorization"];
 
-    if (!authHeader) return res.status(403).json({ error: "Token requerido" });
+  if (!authHeader) return res.status(403).json({ error: "Token requerido" });
 
-    const token = authHeader.split(" ")[1];
+  const token = authHeader.split(" ")[1];
 
-    jwt.verify(token, "CLAVE_SECRETA", (err, user) => {
-        if (err) return res.status(403).json({ error: "Token inválido" });
+  jwt.verify(token, "CLAVE_SECRETA", (err, user) => {
+    if (err) return res.status(403).json({ error: "Token inválido" });
 
-        req.user = user;
-        next();
-    });
+    req.user = user;
+    next();
+  });
 };
 
 //////////////////////////////////////////////////
@@ -44,39 +53,39 @@ const verifyToken = (req, res, next) => {
 //////////////////////////////////////////////////
 
 app.get('/setup-db', async (req, res) => {
-    try {
-        await db.query(`
-            CREATE TABLE IF NOT EXISTS usuarios (
-                id SERIAL PRIMARY KEY,
-                username TEXT UNIQUE,
-                password TEXT
-            );
-        `);
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS usuarios (
+        id SERIAL PRIMARY KEY,
+        username TEXT UNIQUE,
+        password TEXT
+      );
+    `);
 
-        await db.query(`
-            CREATE TABLE IF NOT EXISTS asistencias (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER,
-                proyecto_id INTEGER,
-                entrada TIMESTAMP,
-                salida TIMESTAMP,
-                horas FLOAT,
-                fuera_zona BOOLEAN DEFAULT false
-            );
-        `);
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS asistencias (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER,
+        proyecto_id INTEGER,
+        entrada TIMESTAMP,
+        salida TIMESTAMP,
+        horas FLOAT,
+        fuera_zona BOOLEAN DEFAULT false
+      );
+    `);
 
-        await db.query(`
-            INSERT INTO usuarios (username, password)
-            VALUES ('admin', '123456')
-            ON CONFLICT (username) DO NOTHING;
-        `);
+    await db.query(`
+      INSERT INTO usuarios (username, password)
+      VALUES ('admin', '123456')
+      ON CONFLICT (username) DO NOTHING;
+    `);
 
-        res.send("BD lista");
+    res.send("BD lista");
 
-    } catch (error) {
-        console.log(error);
-        res.send("Error BD");
-    }
+  } catch (error) {
+    console.log("❌ ERROR SETUP:", error);
+    res.status(500).send("Error BD");
+  }
 });
 
 //////////////////////////////////////////////////
@@ -84,61 +93,72 @@ app.get('/setup-db', async (req, res) => {
 //////////////////////////////////////////////////
 
 app.post('/login', async (req, res) => {
-    const { username, password } = req.body;
+  const { username, password } = req.body;
 
+  try {
     const result = await db.query(
-        'SELECT * FROM usuarios WHERE username=$1 AND password=$2',
-        [username, password]
+      'SELECT * FROM usuarios WHERE username=$1 AND password=$2',
+      [username, password]
     );
 
     if (result.rows.length === 0) {
-        return res.status(401).json({ success: false });
+      return res.status(401).json({ success: false });
     }
 
     const user = result.rows[0];
 
     const token = jwt.sign(
-        { id: user.id },
-        "CLAVE_SECRETA",
-        { expiresIn: "2h" }
+      { id: user.id },
+      "CLAVE_SECRETA",
+      { expiresIn: "2h" }
     );
 
     res.json({
-        success: true,
-        user,
-        token
+      success: true,
+      user,
+      token
     });
+
+  } catch (error) {
+    console.log("❌ ERROR LOGIN:", error);
+    res.status(500).json({ success: false });
+  }
 });
 
 //////////////////////////////////////////////////
-// 🔥 ASISTENCIAS (CLAVE)
+// 🔥 ASISTENCIAS
 //////////////////////////////////////////////////
 
 app.post('/asistencias', async (req, res) => {
-    const { user_id, proyecto_id, entrada, horas, fuera_zona } = req.body;
+  const { user_id, proyecto_id, entrada, horas, fuera_zona } = req.body;
 
-    try {
-        await db.query(
-            `INSERT INTO asistencias (user_id, proyecto_id, entrada, horas, fuera_zona)
-             VALUES ($1, $2, $3, $4, $5)`,
-            [user_id, proyecto_id, entrada, horas || 0, fuera_zona]
-        );
+  try {
+    await db.query(
+      `INSERT INTO asistencias (user_id, proyecto_id, entrada, horas, fuera_zona)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [user_id, proyecto_id, entrada, horas || 0, fuera_zona]
+    );
 
-        console.log("📥 GUARDADO:", req.body);
+    console.log("📥 GUARDADO:", req.body);
 
-        res.json({ ok: true });
+    res.json({ ok: true });
 
-    } catch (error) {
-        console.log(error);
-        res.status(500).json({ error: "Error insert" });
-    }
+  } catch (error) {
+    console.log("❌ ERROR INSERT:", error);
+    res.status(500).json({ error: "Error insert" });
+  }
 });
 
 app.get('/asistencias', async (req, res) => {
+  try {
     const result = await db.query(
-        'SELECT * FROM asistencias ORDER BY id DESC'
+      'SELECT * FROM asistencias ORDER BY id DESC'
     );
     res.json(result.rows);
+  } catch (error) {
+    console.log("❌ ERROR GET:", error);
+    res.json([]);
+  }
 });
 
 //////////////////////////////////////////////////
@@ -146,8 +166,8 @@ app.get('/asistencias', async (req, res) => {
 //////////////////////////////////////////////////
 
 app.get('/admin/users', verifyToken, async (req, res) => {
-    const result = await db.query('SELECT id, username FROM usuarios');
-    res.json(result.rows);
+  const result = await db.query('SELECT id, username FROM usuarios');
+  res.json(result.rows);
 });
 
 //////////////////////////////////////////////////
@@ -155,13 +175,19 @@ app.get('/admin/users', verifyToken, async (req, res) => {
 //////////////////////////////////////////////////
 
 app.get('/admin/alerts', verifyToken, async (req, res) => {
+  try {
     const result = await db.query(`
-        SELECT * FROM asistencias
-        WHERE horas > 8 OR fuera_zona = true
-        ORDER BY id DESC
+      SELECT * FROM asistencias
+      WHERE horas > 8 OR fuera_zona = true
+      ORDER BY id DESC
     `);
 
     res.json(result.rows);
+
+  } catch (error) {
+    console.log("❌ ERROR ALERTS:", error);
+    res.json([]);
+  }
 });
 
 //////////////////////////////////////////////////
@@ -171,5 +197,5 @@ app.get('/admin/alerts', verifyToken, async (req, res) => {
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-    console.log("Servidor corriendo 🚀");
+  console.log("🚀 Servidor corriendo en puerto " + PORT);
 });
